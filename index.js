@@ -2,7 +2,15 @@ require("dotenv").config();
 let mongoose = require("mongoose");
 let express = require("express");
 let jwt = require("jsonwebtoken");
-const { signup, login, changeRefresh } = require("./Controller/userController");
+const {
+  signup,
+  login,
+  changeRefresh,
+  userLocation,
+  addLocation,
+  searchAddress,
+  deleteAddress,
+} = require("./Controller/userController");
 (async () => {
   await mongoose.connect("mongodb://127.0.0.1:27017/test", {
     useNewUrlParser: true,
@@ -11,6 +19,54 @@ const { signup, login, changeRefresh } = require("./Controller/userController");
 })();
 let app = express();
 app.use(express.json());
+
+app.patch("/delete-address", verifyUser, async (req, res) => {
+  let data = await deleteAddress(req.decoded.email, req.body);
+  res.status(data.code).json({ message: data.message });
+});
+app.get("/get-address", verifyUser, async (req, res) => {
+  console.log(req.decoded.email);
+  let data = await searchAddress(req.decoded.email, req.body);
+  res.status(data.code).json({ message: data.message });
+});
+app.put("/new-address", verifyUser, async (req, res) => {
+  //   res.status(403).send("dummy error");
+  let locationAdded = await addLocation(req.decoded.email, req.body);
+  res.status(locationAdded.code).json({ message: locationAdded.message });
+});
+
+app.get("/address", verifyUser, async (req, res) => {
+  console.log("Hello");
+  let data = await userLocation(req.decoded.email);
+  console.log("world");
+  if (data.code === 403) {
+    res.status(403).json({ message: data.message });
+    return;
+  }
+  res.status(200).send({ message: data.message });
+});
+function verifyUser(req, res, next) {
+  let authorization = req.headers["authorization"];
+  if (!authorization) {
+    res.status(403).json({ message: "Authorization Key not provided" });
+    return;
+  }
+  let token = authorization.split(" ")[1];
+  if (!token) {
+    res.status(403).json({ message: "Authorization Key not provided" });
+    return;
+  }
+  jwt.verify(token, process.env.AUTHORIZATION_TOKEN_SECRET, (err, decoded) => {
+    if (err) {
+      res.status(403).json({ message: "Authorization Key is not valid" });
+      return;
+    } else {
+      req.decoded = decoded;
+      next();
+    }
+  });
+}
+
 app.post("/login", validateRequest, async (req, res) => {
   console.log(req.details);
   let payload = {
